@@ -1,0 +1,116 @@
+Is it possible to predict the reproductive success of selfing and pollinated plants based on its flower-insect interactions? 
+
+This question could be addressed using a logistic regression or SVM where the predictor variables are the flower-insect interactions and the target variable is the seed mass or number of fruits produced. This question could be addressed using a support vector machine to develop a classification or regression model that separates high- and low-fruit producing plants based on their flower-insect interaction patterns. 
+
+~~~
+
+Libraries
+```{r}
+
+library(ggplot2)
+library(dplyr)
+library(e1071)
+
+```
+Load data
+```{r}
+
+data <- read.csv("C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject/Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
+
+```
+
+
+
+This question could be addressed using a logistic regression or SVM where the predictor variables are the flower-insect interactions and the target variable is the seed mass or number of fruits produced. This question could be addressed using a support vector machine to develop a classification or regression model that separates high- and low-fruit producing plants based on their flower-insect interaction patterns. 
+
+
+Logistic regression - number of flower-insect interactions vs seed mass
+```{r}
+total <- data %>% select("Plot_Number", "Treatment",
+                        "Average_CH_Seed_Mass","Average_CL_Seed_Mass",
+                        "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour") %>%
+  mutate(Total_Average_Seed_Mass = Average_CH_Seed_Mass + Average_CL_Seed_Mass)
+
+ggplot(data = na.omit(total), aes(x = Pollinators_Per_Hour, y = Total_Average_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+Totpol <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
+summary(Totpol)
+
+ggplot(data = na.omit(total), aes(x = Robbers_Per_Hour, y = Total_Average_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+Totrob <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
+summary(Totrob)
+
+ggplot(data = na.omit(total), aes(x = Thieves_Per_Hour, y = Total_Average_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+Totthi <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
+summary(Totthi)
+
+
+
+
+CH <- data %>% select("Plot_Number", "Treatment",
+                        "Average_CH_Seed_Mass",
+                        "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour")
+
+ggplot(data = na.omit(CH), aes(x = Pollinators_Per_Hour, y = Average_CH_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CHpol <- lm(Average_CH_Seed_Mass~Pollinators_Per_Hour, data = CH)
+summary(CHpol)
+
+ggplot(data = na.omit(CH), aes(x = Robbers_Per_Hour, y = Average_CH_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CHrob <- lm(Average_CH_Seed_Mass~Robbers_Per_Hour, data = CH)
+summary(CHrob)
+
+ggplot(data = na.omit(CH), aes(x = Thieves_Per_Hour, y = Average_CH_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CHthi <- lm(Average_CH_Seed_Mass~Thieves_Per_Hour, data = CH)
+summary(CHthi)
+
+
+
+
+CL <- data %>% select("Plot_Number", "Treatment",
+                        "Average_CL_Seed_Mass",
+                        "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour")
+
+ggplot(data = na.omit(CL), aes(x = Pollinators_Per_Hour, y = Average_CL_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CLpol <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
+summary(CLpol)
+
+ggplot(data = na.omit(CL), aes(x = Robbers_Per_Hour, y = Average_CL_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CLrob <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
+summary(CLrob)
+
+ggplot(data = na.omit(CL), aes(x = Thieves_Per_Hour, y = Average_CL_Seed_Mass)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+CLthi <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
+summary(CLthi)
+
+```
+
+
+
+NOT SURE HOW TO DO THE SVM
+
+
+
+
+
+
+
+
+
+
