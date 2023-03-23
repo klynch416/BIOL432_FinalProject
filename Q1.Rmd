@@ -101,16 +101,84 @@ summary(CLthi)
 
 ```
 
+NDMS
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ape)
+library(ggtree)
+library(vegan)
+```
+
+Data
+```{r}
+data <- read.csv("C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject/Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv") %>% select(c(Robbing,Florivory,Pollination,Average_Seeds_Per_CH_Fruit,Average_Seeds_Per_CL_Fruit,Average_CH_Seed_Mass,Average_CL_Seed_Mass))
+
+longdata <- gather(data, interaction, yn, Robbing:Pollination, factor_key = T) %>% na.omit() %>% filter(!yn == "N")
+
+```
 
 
-NOT SURE HOW TO DO THE SVM
+For CH
+```{r}
+nmdsCHdata <- longdata %>% select(c(Average_Seeds_Per_CH_Fruit,Average_Seeds_Per_CL_Fruit,Average_CH_Seed_Mass,Average_CL_Seed_Mass)) 
+factors <- longdata %>% select(interaction) %>% mutate(Plot = row.names(longdata))
+
+nmdsCHdist <- vegdist(nmdsCHdata, method = "bray", binary = F)
+nmdsCHtree <- nj(nmdsCHdist)
+
+NMDSCHdat <- metaMDS(nmdsCHdist, k = 2, trymax = 100)
+
+PDatCH <- data.frame(NMDS1 = NMDSCHdat$points[,1],
+                   NMDS2 = NMDSCHdat$points[,2],
+                   Plot = row.names(nmdsCHdata))
+
+PDatCH <- merge(PDatCH, factors, by = "Plot", all.x = T, all.y = F)
+
+ggplot(data = PDatCH) +
+  geom_point(aes(x = NMDS1, y = NMDS2, colour = interaction)) +
+  scale_colour_discrete(name = "Interaction") +
+  theme_classic()
+
+CH_Mating <- betadisper(nmdsCHdist, group = factors$interaction)
+permutest(CH_Mating)
+plot(CH_Mating, hull=FALSE, ellipse=TRUE) ##sd ellipse
+
+```
 
 
+Is it possible to predict the reproductive success of selfing and pollinated plants based on its flower-insect interactions? 
+
+in NDMS figure - shape by insects and colour by mating type
 
 
+For CL
+```{r}
+nmdsCLdata <- longdata %>% select(c(Average_Seeds_Per_CL_Fruit,Average_CL_Seed_Mass)) 
 
+nmdsCLdist <- vegdist(nmdsCLdata, method = "bray", binary = F)
+nmdsCLtree <- nj(nmdsCLdist)
 
+NMDSCLdat <- metaMDS(nmdsCLdist, k = 2, trymax = 100)
 
+PDatCL <- data.frame(NMDS1 = NMDSCLdat$points[,1],
+                   NMDS2 = NMDSCLdat$points[,2],
+                   Plot = row.names(nmdsCLdata))
+
+PDatCL <- merge(PDatCL, factors, by = "Plot", all.x = T, all.y = F)
+
+ggplot(data = PDatCL) +
+  geom_point(aes(x = NMDS1, y = NMDS2, colour = interaction)) +
+  scale_colour_discrete(name = "Interaction") +
+  theme_classic()
+
+CL_Mating <- betadisper(nmdsCLdist, group = factors$interaction)
+permutest(CL_Mating)
+plot(CL_Mating, hull=FALSE, ellipse=TRUE)
+
+```
 
 
 
