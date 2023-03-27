@@ -5,12 +5,15 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
-```{r setup, include=FALSE, message = false}
+```{r setup, include=FALSE, message = false, warning=FALSE}
 library("dplyr")
 library("ggplot2")
+library("reshape2")
 library("impute")
 library("e1071") # SVM
 library("Metrics")
+library("rpart")
+library("rpart.plot")
 set.seed(1)
 ```
 
@@ -19,7 +22,7 @@ raw_seed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interaction
 preprocessed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
 ```
 
-```{r, warning=TRUE}
+```{r, warning=FALSE}
 # Identify character variables
 char_vars <- sapply(preprocessed_data, is.character)
 
@@ -56,6 +59,29 @@ processed_data <- as.data.frame(imputed_data_matrix)
 ```
 
 ```{r}
+# Remove clearly correlated variables to remove redundancy through feature selection
+processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day)
+```
+
+```{r,fig.height=8,fig.width=10, warning=FALSE}
+# Check correlation between the variables
+# Create a correlation matrix from the dataframe
+cor_matrix <- cor(processed_data)
+
+# Melt the correlation matrix into a long format
+melted_matrix <- melt(cor_matrix)
+
+# Create the heatmap
+ggplot(melted_matrix, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +
+  scale_fill_gradient2(low="blue", mid="white", high="red", midpoint=0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+  axis.text.y = element_text(color = ifelse(melted_matrix$Var1 == "Ratio_of_CH_to_CL_Fruits", "red", "black"))) +
+  labs(title="Correlation Heatmap", x="", y="")
+```
+
+```{r}
 # Perform PCA on the dataset
 pca <- prcomp(processed_data, center = TRUE, scale. = TRUE)
 
@@ -68,6 +94,7 @@ ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) 
   geom_point() +
   labs(x = "PC1", y = "PC2", title = "PCA Plot")
 ```
+
 ```{r}
 # Splitting predictors from response variables
 response <- processed_data$Ratio_of_CH_to_CL_Fruits
@@ -102,8 +129,15 @@ predictions <- predict(svm_model, test_predictors)
 ```
 
 ```{r}
+# Mean square error
 mse <- mse(test_response, predictions)
 mse
 rmse <- rmse(test_response, predictions)
 rmse
+```
+
+```{r, fig.width = 10}
+tree_model <- rpart(Ratio_of_CH_to_CL_Fruits ~ ., data = processed_data, cp = 0.01)
+
+rpart.plot(tree_model)
 ```
