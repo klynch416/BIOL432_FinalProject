@@ -1,0 +1,109 @@
+---
+title: "Important Variables Selfing"
+author: "Edward Chen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = false}
+library("dplyr")
+library("ggplot2")
+library("impute")
+library("e1071") # SVM
+library("Metrics")
+set.seed(1)
+```
+
+```{r}
+raw_seed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Raw_Seed_Data.csv")
+preprocessed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
+```
+
+```{r, warning=TRUE}
+# Identify character variables
+char_vars <- sapply(preprocessed_data, is.character)
+
+# Convert character variables to factors
+preprocessed_data[char_vars] <- lapply(preprocessed_data[char_vars], as.factor)
+
+# Calculate the percentage of missing values in each row
+missing_pct <- rowMeans(is.na(preprocessed_data))
+
+# Identify rows with 50% or more missing values
+missing_rows <- which(missing_pct >= 0.5)
+
+# Remove rows with 50% or more missing values
+preprocessed_data <- preprocessed_data[-missing_rows, ]
+
+# Identify categorical variables
+categorical_vars <- sapply(preprocessed_data, is.factor)
+
+# Remove categorical variables
+preprocessed_data <- preprocessed_data[, !categorical_vars]
+preprocessed_data <- preprocessed_data %>% select(-Plot_Number)
+
+# Set the value of k (number of neighbors)
+k <- 3
+
+# Convert the data frame to a matrix
+preprocessed_data_matrix <- as.matrix(preprocessed_data)
+
+# Perform kNN imputation
+imputed_data_matrix <- impute.knn(preprocessed_data_matrix, k = k)$data
+
+# Convert the imputed matrix back to a data frame
+processed_data <- as.data.frame(imputed_data_matrix)
+```
+
+```{r}
+# Perform PCA on the dataset
+pca <- prcomp(processed_data, center = TRUE, scale. = TRUE)
+
+# Extract principal components
+PC1 <- pca$x[,1]
+PC2 <- pca$x[,2]
+
+# Create PCA plot with color based on "Ratio_of_CH_to_CL_Fruits"
+ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) + 
+  geom_point() +
+  labs(x = "PC1", y = "PC2", title = "PCA Plot")
+```
+```{r}
+# Splitting predictors from response variables
+response <- processed_data$Ratio_of_CH_to_CL_Fruits
+predictors <- processed_data %>% select(-Ratio_of_CH_to_CL_Fruits)
+```
+
+```{r}
+set.seed(123) # Set a seed for reproducibility
+split_ratio <- 0.8 # 80% for training, 20% for testing
+sample_size <- floor(split_ratio * nrow(processed_data))
+
+# Create a random sample of row indices for the training set
+train_indices <- sample(seq_len(nrow(processed_data)), size = sample_size)
+
+# Split the data
+train_predictors <- predictors[train_indices, ]
+train_response <- response[train_indices]
+test_predictors <- predictors[-train_indices, ]
+test_response <- response[-train_indices]
+```
+
+```{r}
+# Set the cost parameter (C) and kernel (e.g., radial, linear, polynomial, or sigmoid)
+cost <- 1
+kernel <- "radial"
+
+svm_model <- svm(train_response ~ ., data = train_predictors, cost = cost, kernel = kernel)
+```
+
+```{r}
+predictions <- predict(svm_model, test_predictors)
+```
+
+```{r}
+mse <- mse(test_response, predictions)
+mse
+rmse <- rmse(test_response, predictions)
+rmse
+```
