@@ -60,7 +60,7 @@ processed_data <- as.data.frame(imputed_data_matrix)
 
 ```{r}
 # Remove clearly correlated variables to remove redundancy through feature selection
-processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day)
+processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day, -Average_CH_Flowers_Per_Day, -Total_CH_Flower_Production, -Average_CL_Flowers_Per_Day, -Average_Seeds_Per_CH_Fruit, -Average_Seeds_Per_CL_Fruit, -Average_CH_Seed_Mass, -Average_CL_Seed_Mass)
 ```
 
 ```{r,fig.height=8,fig.width=10, warning=FALSE}
@@ -89,10 +89,16 @@ pca <- prcomp(processed_data, center = TRUE, scale. = TRUE)
 PC1 <- pca$x[,1]
 PC2 <- pca$x[,2]
 
+# Calculate the percentage of variance explained by each principal component
+pca_var <- (pca$sdev^2) / sum(pca$sdev^2)
+pca_var_percentage <- pca_var * 100
+
 # Create PCA plot with color based on "Ratio_of_CH_to_CL_Fruits"
 ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) + 
   geom_point() +
-  labs(x = "PC1", y = "PC2", title = "PCA Plot")
+  labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
+       y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
+       title = "PCA Plot")
 ```
 
 ```{r}
