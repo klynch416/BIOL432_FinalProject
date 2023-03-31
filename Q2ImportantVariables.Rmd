@@ -14,6 +14,8 @@ library("e1071") # SVM
 library("Metrics")
 library("rpart")
 library("rpart.plot")
+library("e1071")
+library("caTools")
 set.seed(1)
 ```
 
@@ -82,6 +84,29 @@ ggplot(melted_matrix, aes(x=Var1, y=Var2, fill=value)) +
 ```
 
 ```{r}
+# Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
+mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Create a histogram and add the mean as a vertical line with its value
+ggplot(processed_data, aes(x = Ratio_of_CH_to_CL_Fruits)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", color = "black", alpha = 0.5) +
+  geom_vline(aes(xintercept = mean_ratio), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_ratio, y = 0, label = paste("Mean =", round(mean_ratio, 2)), 
+           vjust = -1, color = "red", fontface = "bold") +
+  labs(x = "Ratio of CH to CL Fruits", y = "Density", title = "Histogram of Ratio of CH to CL Fruits with Mean")
+```
+
+```{r}
+# Create a histogram and add the mean as a vertical line with its value
+ggplot(processed_data, aes(x = Ratio_of_CH_to_CL_Fruits)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", color = "black", alpha = 0.5) +
+  geom_vline(aes(xintercept = mean_ratio), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_ratio, y = 0, label = paste("Mean =", round(mean_ratio, 2)), 
+           vjust = -1, color = "red", fontface = "bold") +
+  labs(x = "Ratio of CH to CL Fruits", y = "Density", title = "Histogram of Ratio of CH to CL Fruits with Mean")
+```
+
+```{r}
 # Perform PCA on the dataset
 pca <- prcomp(processed_data, center = TRUE, scale. = TRUE)
 
@@ -96,54 +121,102 @@ pca_var_percentage <- pca_var * 100
 # Create PCA plot with color based on "Ratio_of_CH_to_CL_Fruits"
 ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) + 
   geom_point() +
+  scale_color_gradient(low = "blue", high = "red") +
   labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
        y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
        title = "PCA Plot")
 ```
 
 ```{r}
-# Splitting predictors from response variables
-response <- processed_data$Ratio_of_CH_to_CL_Fruits
-predictors <- processed_data %>% select(-Ratio_of_CH_to_CL_Fruits)
+
+# Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
+mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Create a binary group column based on the condition (>1.95, <1.95)
+processed_data$Binary_Group <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > mean_ratio, ">1.95", "<1.95")
+
+# Create PCA plot with color based on binary groups
+ggplot(processed_data, aes(x = PC1, y = PC2, color = Binary_Group)) + 
+  geom_point() +
+  scale_color_manual(values = c("<1.95" = "blue", ">1.95" = "red"), name = "Binary Group") +
+  labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
+       y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
+       title = "PCA Plot") 
+```
+```{r}
+# Calculate the mean value of the Ratio_of_CH_to_CL_Fruits variable
+mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Create a new binary_response variable in the processed_data dataframe based on whether the Ratio_of_CH_to_CL_Fruits variable is greater than the mean value
+processed_data$binary_response <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > mean_ratio, 1, 0)
+
+# Remove the Ratio_of_CH_to_CL_Fruits and Binary_Group variables from the processed_data dataframe
+processed_data <- processed_data %>% select(-Ratio_of_CH_to_CL_Fruits, -Binary_Group)
+
+# Split the processed_data dataframe into training and test sets using a 70/30 split ratio
+set.seed(123)
+split <- sample.split(processed_data$binary_response, SplitRatio = 0.7)
+train <- processed_data[split,]
+test <- processed_data[!split,]
+
+# Train an SVM model on the training data using a linear kernel and cost parameter of 1
+svm_model <- svm(binary_response ~ ., data = train, kernel = "linear", type = "C-classification", cost = 1)
+
+# Make predictions on the test data using the trained SVM model
+predictions <- predict(svm_model, newdata = test)
+
+# Create a confusion matrix to evaluate the performance of the model
+table(predictions, test$binary_response)
 ```
 
 ```{r}
-set.seed(123) # Set a seed for reproducibility
-split_ratio <- 0.8 # 80% for training, 20% for testing
-sample_size <- floor(split_ratio * nrow(processed_data))
+# Create a confusion matrix to evaluate the performance of the model
+confusion_matrix <- table(predictions, test$binary_response)
 
-# Create a random sample of row indices for the training set
-train_indices <- sample(seq_len(nrow(processed_data)), size = sample_size)
+# Calculate accuracy
+accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+cat("Accuracy:", round(accuracy, 3), "\n")
 
-# Split the data
-train_predictors <- predictors[train_indices, ]
-train_response <- response[train_indices]
-test_predictors <- predictors[-train_indices, ]
-test_response <- response[-train_indices]
+# Calculate precision
+precision <- confusion_matrix[2, 2]/sum(confusion_matrix[, 2])
+cat("Precision:", round(precision, 3), "\n")
+
+# Calculate recall
+recall <- confusion_matrix[2, 2]/sum(confusion_matrix[2, ])
+cat("Recall:", round(recall, 3), "\n")
+
+# Calculate F1-score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+cat("F1-score:", round(f1_score, 3), "\n")
+```
+
+
+```{r, fig.width = 10, fig.height = 8}
+# Build the decision tree model
+dt_model <- rpart(binary_response ~ ., data = processed_data, method = "class")
+
+# Plot the decision tree
+plot(dt_model)
+text(dt_model, use.n = TRUE, all = TRUE, cex = 0.7)
 ```
 
 ```{r}
-# Set the cost parameter (C) and kernel (e.g., radial, linear, polynomial, or sigmoid)
-cost <- 1
-kernel <- "radial"
+# Make predictions on the test set
+dt_predictions <- predict(dt_model, newdata = test, type = "class")
 
-svm_model <- svm(train_response ~ ., data = train_predictors, cost = cost, kernel = kernel)
-```
+# Create a confusion matrix to evaluate the performance of the model
+confusion_matrix <- table(dt_predictions, test$binary_response)
 
-```{r}
-predictions <- predict(svm_model, test_predictors)
-```
+# Calculate accuracy, precision, recall, and F1-score
+accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
+precision <- confusion_matrix[2, 2]/sum(confusion_matrix[, 2])
+recall <- confusion_matrix[2, 2]/sum(confusion_matrix[2, ])
+f1_score <- 2 * (precision * recall) / (precision + recall)
 
-```{r}
-# Mean square error
-mse <- mse(test_response, predictions)
-mse
-rmse <- rmse(test_response, predictions)
-rmse
-```
-
-```{r, fig.width = 10}
-tree_model <- rpart(Ratio_of_CH_to_CL_Fruits ~ ., data = processed_data, cp = 0.01)
-
-rpart.plot(tree_model)
+# Print the performance metrics
+cat("Decision tree performance metrics:\n")
+cat("Accuracy:", round(accuracy, 3), "\n")
+cat("Precision:", round(precision, 3), "\n")
+cat("Recall:", round(recall, 3), "\n")
+cat("F1-score:", round(f1_score, 3), "\n")
 ```
