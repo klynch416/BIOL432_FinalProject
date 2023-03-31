@@ -7,16 +7,46 @@ output: html_document
 
 ```{r setup, include=FALSE, message = false, warning=FALSE}
 library("dplyr")
+library("tidyr")
 library("ggplot2")
+library("ggpubr")
+library("gridExtra")
 library("reshape2")
 library("impute")
 library("e1071") # SVM
 library("Metrics")
 library("rpart")
 library("rpart.plot")
-library("e1071")
 library("caTools")
-set.seed(1)
+library("randomForest")
+library("caret")
+library("GGally")
+set.seed(123)
+```
+
+```{r}
+# Function to combine multiple ggplot objects into a single plot
+multiplot <- function(..., cols = 1) {
+  plot_list <- list(...)
+  
+  # Calculate the number of rows needed for the plot grid
+  n_rows <- ceiling(length(plot_list) / cols)
+  
+  # Create an empty plot grid
+  grid <- matrix(vector(mode = "list", length = n_rows * cols),
+                 ncol = cols, nrow = n_rows)
+  
+  # Fill the plot grid with plots
+  for (i in 1:length(plot_list)) {
+    row_idx <- ceiling(i / cols)
+    col_idx <- i %% cols
+    if (col_idx == 0) col_idx <- cols
+    grid[[row_idx, col_idx]] <- plot_list[[i]]
+  }
+  
+  # Combine the plots into a single plot
+  gridExtra::grid.arrange(grobs = grid, ncol = cols)
+}
 ```
 
 ```{r}
@@ -126,9 +156,42 @@ ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) 
        y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
        title = "PCA Plot")
 ```
+```{r, warning=FALSE, message=FALSE}
+# Extract first 4 principal components
+PCs <- pca$x[, 1:4]
+
+# Calculate the percentage of variance explained by each principal component
+pca_var <- (pca$sdev^2) / sum(pca$sdev^2)
+pca_var_percentage <- pca_var * 100
+
+# Create a new data frame with the first 4 principal components and the Ratio_of_CH_to_CL_Fruits variable
+pca_data <- data.frame(PCs, Ratio_of_CH_to_CL_Fruits = processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Customize axis labels
+axis_labels <- paste0("PC", 1:4, " (", round(pca_var_percentage[1:4], 2), "%)")
+
+# Create a multifaceted PCA plot using ggpairs
+p <- ggpairs(
+  pca_data,
+  columns = 1:4,
+  mapping = aes(color = Ratio_of_CH_to_CL_Fruits),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag = list(continuous = "barDiag"),
+  columnLabels = axis_labels,
+  title = "Pairwise Comparisons of First 4 Principal Components",
+  progress = FALSE
+)
+
+# Modify color gradient
+p <- p + scale_color_gradient(low = "blue", high = "red")
+
+# Print the plot
+print(p)
+```
+
 
 ```{r}
-
 # Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
 mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
 
@@ -149,12 +212,12 @@ mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
 
 # Create a new binary_response variable in the processed_data dataframe based on whether the Ratio_of_CH_to_CL_Fruits variable is greater than the mean value
 processed_data$binary_response <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > mean_ratio, 1, 0)
+processed_data$binary_response <- as.factor(processed_data$binary_response)
 
 # Remove the Ratio_of_CH_to_CL_Fruits and Binary_Group variables from the processed_data dataframe
 processed_data <- processed_data %>% select(-Ratio_of_CH_to_CL_Fruits, -Binary_Group)
 
 # Split the processed_data dataframe into training and test sets using a 70/30 split ratio
-set.seed(123)
 split <- sample.split(processed_data$binary_response, SplitRatio = 0.7)
 train <- processed_data[split,]
 test <- processed_data[!split,]
@@ -196,8 +259,7 @@ cat("F1-score:", round(f1_score, 3), "\n")
 dt_model <- rpart(binary_response ~ ., data = processed_data, method = "class")
 
 # Plot the decision tree
-plot(dt_model)
-text(dt_model, use.n = TRUE, all = TRUE, cex = 0.7)
+rpart.plot(dt_model, fallen.leaves = TRUE)
 ```
 
 ```{r}
@@ -219,4 +281,29 @@ cat("Accuracy:", round(accuracy, 3), "\n")
 cat("Precision:", round(precision, 3), "\n")
 cat("Recall:", round(recall, 3), "\n")
 cat("F1-score:", round(f1_score, 3), "\n")
+```
+
+```{r}
+# Set up k-fold cross-validation
+k <- 5
+cv_folds <- createFolds(train$binary_response, k = k, list = TRUE, returnTrain = TRUE)
+
+# Create a train control object
+train_control <- trainControl(method = "cv", number = k, index = cv_folds, savePredictions = TRUE)
+
+# Train the random forest model with k-fold cross-validation
+set.seed(123)
+rf_model_cv <- train(binary_response ~ ., data = train, method = "rf", trControl = train_control, tuneLength = 1)
+
+# Print the model and cross-validated performance metrics
+print(rf_model_cv)
+
+# Make predictions on the test set
+rf_predictions <- predict(rf_model_cv, newdata = test)
+
+# Calculate the confusion matrix
+confusion_matrix_rf <- confusionMatrix(rf_predictions, test$binary_response)
+
+# Print the confusion matrix and performance metrics
+print(confusion_matrix_rf)
 ```
