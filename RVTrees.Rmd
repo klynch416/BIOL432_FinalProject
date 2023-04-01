@@ -85,6 +85,6 @@ Make the tree:
 ```{r}
 SeedMassTree <- tree(Binary_Avg_Seed_Mass ~ ., data = TDat, method = "class")
 
-plot(SeedMassTree)
+plot(SeedMassTree) # hmmmmmm
 text(SeedMassTree, cex = 0.7, adj = 0)
 ```
