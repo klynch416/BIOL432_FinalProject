@@ -12,65 +12,44 @@ library(dplyr)
 library(e1071)
 
 ```
-Load data
-```{r}
-
-data <- read.csv("C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject/Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
-
-```
-
-
 
 This question could be addressed using a logistic regression or SVM where the predictor variables are the flower-insect interactions and the target variable is the seed mass or number of fruits produced. This question could be addressed using a support vector machine to develop a classification or regression model that separates high- and low-fruit producing plants based on their flower-insect interaction patterns. 
 
-
 Logistic regression - number of flower-insect interactions vs seed mass
 ```{r}
-total <- data %>% select("Plot_Number", "Treatment",
-                        "Average_CH_Seed_Mass","Average_CL_Seed_Mass",
-                        "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour") %>%
-  mutate(Total_Average_Seed_Mass = Average_CH_Seed_Mass + Average_CL_Seed_Mass)
-
-ggplot(data = na.omit(total), aes(x = Pollinators_Per_Hour, y = Total_Average_Seed_Mass)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-Totpol <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
-summary(Totpol)
-
-ggplot(data = na.omit(total), aes(x = Robbers_Per_Hour, y = Total_Average_Seed_Mass)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-Totrob <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
-summary(Totrob)
-
-ggplot(data = na.omit(total), aes(x = Thieves_Per_Hour, y = Total_Average_Seed_Mass)) +
-  geom_point() +
-  geom_smooth(method = "lm")
-Totthi <- lm(Total_Average_Seed_Mass~Pollinators_Per_Hour, data = seed)
-summary(Totthi)
-
-
-
+data <- read.csv("C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject/Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
 
 CH <- data %>% select("Plot_Number", "Treatment",
                         "Average_CH_Seed_Mass",
                         "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour")
 
-ggplot(data = na.omit(CH), aes(x = Pollinators_Per_Hour, y = Average_CH_Seed_Mass)) +
+CHP <- ggplot(data = na.omit(CH), aes(x = Pollinators_Per_Hour, y = Average_CH_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Pollinators/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+
 CHpol <- lm(Average_CH_Seed_Mass~Pollinators_Per_Hour, data = CH)
 summary(CHpol)
 
-ggplot(data = na.omit(CH), aes(x = Robbers_Per_Hour, y = Average_CH_Seed_Mass)) +
+CHR <- ggplot(data = na.omit(CH), aes(x = Robbers_Per_Hour, y = Average_CH_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Robbers/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+
 CHrob <- lm(Average_CH_Seed_Mass~Robbers_Per_Hour, data = CH)
 summary(CHrob)
 
-ggplot(data = na.omit(CH), aes(x = Thieves_Per_Hour, y = Average_CH_Seed_Mass)) +
+CHT <- ggplot(data = na.omit(CH), aes(x = Thieves_Per_Hour, y = Average_CH_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Thieves/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+
 CHthi <- lm(Average_CH_Seed_Mass~Thieves_Per_Hour, data = CH)
 summary(CHthi)
 
@@ -81,21 +60,34 @@ CL <- data %>% select("Plot_Number", "Treatment",
                         "Average_CL_Seed_Mass",
                         "Pollinators_Per_Hour", "Robbers_Per_Hour", "Thieves_Per_Hour")
 
-ggplot(data = na.omit(CL), aes(x = Pollinators_Per_Hour, y = Average_CL_Seed_Mass)) +
+CLP <- ggplot(data = na.omit(CL), aes(x = Pollinators_Per_Hour, y = Average_CL_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Pollinators/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+
 CLpol <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
 summary(CLpol)
 
-ggplot(data = na.omit(CL), aes(x = Robbers_Per_Hour, y = Average_CL_Seed_Mass)) +
+CLR <- ggplot(data = na.omit(CL), aes(x = Robbers_Per_Hour, y = Average_CL_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Robbers/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+  
+  
 CLrob <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
 summary(CLrob)
 
-ggplot(data = na.omit(CL), aes(x = Thieves_Per_Hour, y = Average_CL_Seed_Mass)) +
+CLT <- ggplot(data = na.omit(CL), aes(x = Thieves_Per_Hour, y = Average_CL_Seed_Mass)) +
   geom_point() +
-  geom_smooth(method = "lm")
+  geom_smooth(method = "lm") +
+  scale_x_continuous(name = "Thieves/ hour") +
+  scale_y_continuous(name = "Average seed mass (g)") +
+  theme_classic()
+
 CLthi <- lm(Average_CL_Seed_Mass~Thieves_Per_Hour, data = CL)
 summary(CLthi)
 
@@ -191,13 +183,18 @@ library(ggpubr)
 Logistic regressions
 ```{r}
 
+ggarrange(CHP, CLP, CHR, CLR, CHT, CLT,
+          nrow = 3, ncol = 2)
+
+
 ```
 
 NMDS
 ```{r}
 
-ggarrange(CLM_Plot, CHM_Plot, labels = "AUTO", nrow = 1, ncol = 2,
-          common.legend = TRUE)
+NDMS_Plot <- ggarrange(CLM_Plot, CHM_Plot, labels = "AUTO", nrow = 1, ncol = 2, common.legend = TRUE)
+
+ggsave("NMDSPlot.png", plot = NDMS_Plot, path = "C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject", width = 7, height = 5)
 
 ```
 
