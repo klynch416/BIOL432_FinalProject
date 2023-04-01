@@ -100,7 +100,7 @@ processed_data <- read.csv("processed_data.csv")
 
 ```{r}
 # Remove clearly correlated variables to remove redundancy through feature selection
-processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day, -Average_CH_Flowers_Per_Day, -Total_CH_Flower_Production, -Average_CL_Flowers_Per_Day, -Average_Seeds_Per_CH_Fruit, -Average_Seeds_Per_CL_Fruit, -Average_CH_Seed_Mass, -Average_CL_Seed_Mass)
+processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day, -Average_CH_Flowers_Per_Day, -Total_CH_Flower_Production, -Average_CL_Flowers_Per_Day, -Average_Seeds_Per_CH_Fruit, -Average_Seeds_Per_CL_Fruit, -Average_CH_Seed_Mass, -Average_CL_Seed_Mass, -X)
 ```
 
 ```{r,fig.height=8,fig.width=10, warning=FALSE}
