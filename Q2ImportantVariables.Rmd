@@ -21,73 +21,81 @@ library("caTools")
 library("randomForest")
 library("caret")
 library("GGally")
+library("pROC")
 set.seed(123)
 ```
 
 ```{r}
-# Function to combine multiple ggplot objects into a single plot
-multiplot <- function(..., cols = 1) {
-  plot_list <- list(...)
+# Plots confusion matrix and prints metrics
+metrics <- function(predictions, labels) {
+  # Calculate the confusion matrix
+  confusion_matrix <- confusionMatrix(predictions, labels)
   
-  # Calculate the number of rows needed for the plot grid
-  n_rows <- ceiling(length(plot_list) / cols)
+  # Convert the confusion matrix to a data frame
+  confusion_matrix_df <- as.data.frame.matrix(confusion_matrix$table)
   
-  # Create an empty plot grid
-  grid <- matrix(vector(mode = "list", length = n_rows * cols),
-                 ncol = cols, nrow = n_rows)
+  # Add row names as a column
+  confusion_matrix_df$Predicted <- rownames(confusion_matrix_df)
   
-  # Fill the plot grid with plots
-  for (i in 1:length(plot_list)) {
-    row_idx <- ceiling(i / cols)
-    col_idx <- i %% cols
-    if (col_idx == 0) col_idx <- cols
-    grid[[row_idx, col_idx]] <- plot_list[[i]]
-  }
+  # Reshape the data into long format
+  confusion_matrix_long <- gather(confusion_matrix_df, "Actual", "Count", -Predicted)
   
-  # Combine the plots into a single plot
-  gridExtra::grid.arrange(grobs = grid, ncol = cols)
+  # Calculate the accuracy, precision, and recall
+  accuracy <- confusion_matrix$overall["Accuracy"]
+  precision <- confusion_matrix$byClass["Pos Pred Value"]
+  recall <- confusion_matrix$byClass["Sensitivity"]
+  
+  # Print the accuracy, precision, and recall
+  cat("Accuracy:", round(accuracy, 3), "\n")
+  cat("Precision:", round(precision, 3), "\n")
+  cat("Recall:", round(recall, 3), "\n")
+  
+  # Plot the confusion matrix using ggplot2
+  ggplot(confusion_matrix_long, aes(x = Predicted, y = Actual, fill = Count)) +
+    geom_tile(color = "white", size = 0.5) +
+    scale_fill_gradient(low = "white", high = "steelblue", name = "Count", na.value = "grey90") +
+    geom_text(aes(label = Count), color = "black", size = 12) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+}
+
+plot_roc <- function(model, test, labels) {
+  # Calculate the predicted probabilities
+  predicted_probabilities <- predict(model, test, type = "prob")[,2]
+  
+  # Calculate the ROC curve
+  roc_curve <- roc(labels, predicted_probabilities)
+  
+  # Get AUC value
+  auc_value <- round(auc(roc_curve), 2)
+  
+  # Convert ROC curve to a data frame
+  roc_data <- coords(roc_curve, "all")
+  
+  # Plot the ROC curve using ggplot2
+  roc_plot <- ggplot(data = roc_data, aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(color = "steelblue", size = 1.5) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey50", size = 1) +
+    scale_x_continuous("False Positive Rate", limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous("True Positive Rate", limits = c(0, 1), expand = c(0, 0)) +
+    theme_minimal() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(color = "grey80", fill = NA, size = 1),
+          axis.line = element_line(color = "grey50", size = 0.5),
+          legend.position = "none") +
+    ggtitle("ROC Curve") +
+    # Display AUC value
+    annotate("text", x = 0.6, y = 0.2, label = paste0("AUC = ", auc_value))
+  
+  # Return ROC plot
+  return(roc_plot)
 }
 ```
 
-```{r}
-raw_seed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Raw_Seed_Data.csv")
-preprocessed_data <- read.csv("Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
-```
-
 ```{r, warning=FALSE}
-# Identify character variables
-char_vars <- sapply(preprocessed_data, is.character)
-
-# Convert character variables to factors
-preprocessed_data[char_vars] <- lapply(preprocessed_data[char_vars], as.factor)
-
-# Calculate the percentage of missing values in each row
-missing_pct <- rowMeans(is.na(preprocessed_data))
-
-# Identify rows with 50% or more missing values
-missing_rows <- which(missing_pct >= 0.5)
-
-# Remove rows with 50% or more missing values
-preprocessed_data <- preprocessed_data[-missing_rows, ]
-
-# Identify categorical variables
-categorical_vars <- sapply(preprocessed_data, is.factor)
-
-# Remove categorical variables
-preprocessed_data <- preprocessed_data[, !categorical_vars]
-preprocessed_data <- preprocessed_data %>% select(-Plot_Number)
-
-# Set the value of k (number of neighbors)
-k <- 3
-
-# Convert the data frame to a matrix
-preprocessed_data_matrix <- as.matrix(preprocessed_data)
-
-# Perform kNN imputation
-imputed_data_matrix <- impute.knn(preprocessed_data_matrix, k = k)$data
-
-# Convert the imputed matrix back to a data frame
-processed_data <- as.data.frame(imputed_data_matrix)
+processed_data <- read.csv("processed_data.csv")
 ```
 
 ```{r}
@@ -117,16 +125,6 @@ ggplot(melted_matrix, aes(x=Var1, y=Var2, fill=value)) +
 # Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
 mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
 
-# Create a histogram and add the mean as a vertical line with its value
-ggplot(processed_data, aes(x = Ratio_of_CH_to_CL_Fruits)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", color = "black", alpha = 0.5) +
-  geom_vline(aes(xintercept = mean_ratio), color = "red", linetype = "dashed", size = 1) +
-  annotate("text", x = mean_ratio, y = 0, label = paste("Mean =", round(mean_ratio, 2)), 
-           vjust = -1, color = "red", fontface = "bold") +
-  labs(x = "Ratio of CH to CL Fruits", y = "Density", title = "Histogram of Ratio of CH to CL Fruits with Mean")
-```
-
-```{r}
 # Create a histogram and add the mean as a vertical line with its value
 ggplot(processed_data, aes(x = Ratio_of_CH_to_CL_Fruits)) +
   geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", color = "black", alpha = 0.5) +
@@ -192,26 +190,20 @@ print(p)
 
 
 ```{r}
-# Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
-mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
-
 # Create a binary group column based on the condition (>1.95, <1.95)
-processed_data$Binary_Group <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > mean_ratio, ">1.95", "<1.95")
+processed_data$Binary_Group <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > 1, ">1", "<1")
 
 # Create PCA plot with color based on binary groups
 ggplot(processed_data, aes(x = PC1, y = PC2, color = Binary_Group)) + 
   geom_point() +
-  scale_color_manual(values = c("<1.95" = "blue", ">1.95" = "red"), name = "Binary Group") +
+  scale_color_manual(values = c("<1" = "blue", ">1" = "red"), name = "Binary Group") +
   labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
        y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
        title = "PCA Plot") 
 ```
 ```{r}
-# Calculate the mean value of the Ratio_of_CH_to_CL_Fruits variable
-mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
-
 # Create a new binary_response variable in the processed_data dataframe based on whether the Ratio_of_CH_to_CL_Fruits variable is greater than the mean value
-processed_data$binary_response <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > mean_ratio, 1, 0)
+processed_data$binary_response <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > 1, "CH", "CL")
 processed_data$binary_response <- as.factor(processed_data$binary_response)
 
 # Remove the Ratio_of_CH_to_CL_Fruits and Binary_Group variables from the processed_data dataframe
@@ -226,33 +218,12 @@ test <- processed_data[!split,]
 svm_model <- svm(binary_response ~ ., data = train, kernel = "linear", type = "C-classification", cost = 1)
 
 # Make predictions on the test data using the trained SVM model
-predictions <- predict(svm_model, newdata = test)
-
-# Create a confusion matrix to evaluate the performance of the model
-table(predictions, test$binary_response)
+svm_predictions <- predict(svm_model, newdata = test)
 ```
 
 ```{r}
-# Create a confusion matrix to evaluate the performance of the model
-confusion_matrix <- table(predictions, test$binary_response)
-
-# Calculate accuracy
-accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-cat("Accuracy:", round(accuracy, 3), "\n")
-
-# Calculate precision
-precision <- confusion_matrix[2, 2]/sum(confusion_matrix[, 2])
-cat("Precision:", round(precision, 3), "\n")
-
-# Calculate recall
-recall <- confusion_matrix[2, 2]/sum(confusion_matrix[2, ])
-cat("Recall:", round(recall, 3), "\n")
-
-# Calculate F1-score
-f1_score <- 2 * (precision * recall) / (precision + recall)
-cat("F1-score:", round(f1_score, 3), "\n")
+metrics(svm_predictions, test$binary_response)
 ```
-
 
 ```{r, fig.width = 10, fig.height = 8}
 # Build the decision tree model
@@ -266,21 +237,7 @@ rpart.plot(dt_model, fallen.leaves = TRUE)
 # Make predictions on the test set
 dt_predictions <- predict(dt_model, newdata = test, type = "class")
 
-# Create a confusion matrix to evaluate the performance of the model
-confusion_matrix <- table(dt_predictions, test$binary_response)
-
-# Calculate accuracy, precision, recall, and F1-score
-accuracy <- sum(diag(confusion_matrix))/sum(confusion_matrix)
-precision <- confusion_matrix[2, 2]/sum(confusion_matrix[, 2])
-recall <- confusion_matrix[2, 2]/sum(confusion_matrix[2, ])
-f1_score <- 2 * (precision * recall) / (precision + recall)
-
-# Print the performance metrics
-cat("Decision tree performance metrics:\n")
-cat("Accuracy:", round(accuracy, 3), "\n")
-cat("Precision:", round(precision, 3), "\n")
-cat("Recall:", round(recall, 3), "\n")
-cat("F1-score:", round(f1_score, 3), "\n")
+metrics(dt_predictions, test$binary_response)
 ```
 
 ```{r}
@@ -292,18 +249,20 @@ cv_folds <- createFolds(train$binary_response, k = k, list = TRUE, returnTrain =
 train_control <- trainControl(method = "cv", number = k, index = cv_folds, savePredictions = TRUE)
 
 # Train the random forest model with k-fold cross-validation
-set.seed(123)
 rf_model_cv <- train(binary_response ~ ., data = train, method = "rf", trControl = train_control, tuneLength = 1)
 
 # Print the model and cross-validated performance metrics
 print(rf_model_cv)
 
+```
+
+
+```{r}
 # Make predictions on the test set
 rf_predictions <- predict(rf_model_cv, newdata = test)
+metrics(rf_predictions, test$binary_response)
+```
 
-# Calculate the confusion matrix
-confusion_matrix_rf <- confusionMatrix(rf_predictions, test$binary_response)
-
-# Print the confusion matrix and performance metrics
-print(confusion_matrix_rf)
+```{r}
+plot_roc(rf_model_cv, test, test$binary_response)
 ```
