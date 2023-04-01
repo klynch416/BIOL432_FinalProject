@@ -1,0 +1,90 @@
+---
+title: "Random Forests (Q3)"
+author: "Rishona Vemulapalli (20164619)"
+date: "2023-03-23"
+output: html_document
+---
+
+Research Question #3: Can we identify the most important variables that influence plant reproductive success and use them to develop a decision tree that can guide plant breeding efforts? 
+
+Details: This question could be addressed using a decision tree to identify the most important variables that contribute to plant reproductive success and to develop a breeding strategy that focuses on optimizing those variables.
+
+NOTES:
+- Have to do decision tree first, to find most important
+- Variable must be binary? (0s and 1s) Seed mass? Add them
+- Will have to determine what best represents a threshold for reproductive success
+- Threshold (average of the column) potentially, have to see what makes sense
+    - Below threshold = 0, above threshold = 1
+- Decision tree will tell you what threshold it split on for each variable (the first is the most important)
+- Response variable for decision tree is same for random forest. 
+- Number of seeds?
+- Do a histogram (would be best if histogram is not normally distributed)
+
+----------------------------
+
+### Setup:
+```{r message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(tree)
+library(rpart)
+library(gbm)
+library(randomForest)
+```
+
+### Load the data
+```{r}
+Dat <- read.csv("./data/Soper_Gorden_Adler_AJB_2018_Flower_Insect_Interactions_Processed_Data.csv")
+```
+
+# Lets just use CL bc CH sucks
+```{r}
+# Checking distribution of data
+hist(Dat$Average_CL_Seed_Mass)
+```
+
+Remove CH column:
+```{r}
+Dat2 <- Dat %>%
+  select(-c(Plot_Number, Average_CH_Seed_Mass))
+```
+
+Checking summary stats for the average CH seed mass:
+```{r}
+summary(Dat2$Average_CL_Seed_Mass)
+```
+
+Remove all rows with NA's (to exclude the 59 NAs in the seed mass volume)
+```{r}
+Dat3 <- Dat2[complete.cases(Dat2$Average_CL_Seed_Mass), ]
+```
+
+Summary to see new mean of CL seed mass (after NAs removed)
+```{r}
+summary(Dat3$Average_CL_Seed_Mass)
+```
+
+Make Average CL seed mass into a binary response variable (mean and above = 1, below = 0)
+```{r}
+Dat3$Binary_Avg_Seed_Mass <- ifelse(Dat3$Average_CL_Seed_Mass > mean(Dat3$Average_CL_Seed_Mass), 1, 0)
+```
+
+Remove Average CL Seed Mass Column
+```{r}
+TreeDat <- Dat3 %>%
+  select(-c(Average_CL_Seed_Mass))
+
+TDat <- TreeDat %>%
+  mutate(Treatment = as.factor(Treatment),
+         Robbing = as.factor(Robbing), 
+         Florivory = as.factor(Florivory),
+         Pollination = as.factor(Pollination))
+```
+
+Make the tree:
+```{r}
+SeedMassTree <- tree(Binary_Avg_Seed_Mass ~ ., data = TDat, method = "class")
+
+plot(SeedMassTree)
+text(SeedMassTree, cex = 0.7, adj = 0)
+```
