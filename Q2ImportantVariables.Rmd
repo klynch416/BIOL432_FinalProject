@@ -1,0 +1,268 @@
+---
+title: "Important Variables Selfing"
+author: "Edward Chen"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message = false, warning=FALSE}
+library("dplyr")
+library("tidyr")
+library("ggplot2")
+library("ggpubr")
+library("gridExtra")
+library("reshape2")
+library("impute")
+library("e1071") # SVM
+library("Metrics")
+library("rpart")
+library("rpart.plot")
+library("caTools")
+library("randomForest")
+library("caret")
+library("GGally")
+library("pROC")
+set.seed(123)
+```
+
+```{r}
+# Plots confusion matrix and prints metrics
+metrics <- function(predictions, labels) {
+  # Calculate the confusion matrix
+  confusion_matrix <- confusionMatrix(predictions, labels)
+  
+  # Convert the confusion matrix to a data frame
+  confusion_matrix_df <- as.data.frame.matrix(confusion_matrix$table)
+  
+  # Add row names as a column
+  confusion_matrix_df$Predicted <- rownames(confusion_matrix_df)
+  
+  # Reshape the data into long format
+  confusion_matrix_long <- gather(confusion_matrix_df, "Actual", "Count", -Predicted)
+  
+  # Calculate the accuracy, precision, and recall
+  accuracy <- confusion_matrix$overall["Accuracy"]
+  precision <- confusion_matrix$byClass["Pos Pred Value"]
+  recall <- confusion_matrix$byClass["Sensitivity"]
+  
+  # Print the accuracy, precision, and recall
+  cat("Accuracy:", round(accuracy, 3), "\n")
+  cat("Precision:", round(precision, 3), "\n")
+  cat("Recall:", round(recall, 3), "\n")
+  
+  # Plot the confusion matrix using ggplot2
+  ggplot(confusion_matrix_long, aes(x = Predicted, y = Actual, fill = Count)) +
+    geom_tile(color = "white", size = 0.5) +
+    scale_fill_gradient(low = "white", high = "steelblue", name = "Count", na.value = "grey90") +
+    geom_text(aes(label = Count), color = "black", size = 12) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+    labs(title = "Confusion Matrix", x = "Predicted", y = "Actual")
+}
+
+plot_roc <- function(model, test, labels) {
+  # Calculate the predicted probabilities
+  predicted_probabilities <- predict(model, test, type = "prob")[,2]
+  
+  # Calculate the ROC curve
+  roc_curve <- roc(labels, predicted_probabilities)
+  
+  # Get AUC value
+  auc_value <- round(auc(roc_curve), 2)
+  
+  # Convert ROC curve to a data frame
+  roc_data <- coords(roc_curve, "all")
+  
+  # Plot the ROC curve using ggplot2
+  roc_plot <- ggplot(data = roc_data, aes(x = 1 - specificity, y = sensitivity)) +
+    geom_line(color = "steelblue", size = 1.5) +
+    geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "grey50", size = 1) +
+    scale_x_continuous("False Positive Rate", limits = c(0, 1), expand = c(0, 0)) +
+    scale_y_continuous("True Positive Rate", limits = c(0, 1), expand = c(0, 0)) +
+    theme_minimal() +
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_rect(color = "grey80", fill = NA, size = 1),
+          axis.line = element_line(color = "grey50", size = 0.5),
+          legend.position = "none") +
+    ggtitle("ROC Curve") +
+    # Display AUC value
+    annotate("text", x = 0.6, y = 0.2, label = paste0("AUC = ", auc_value))
+  
+  # Return ROC plot
+  return(roc_plot)
+}
+```
+
+```{r, warning=FALSE}
+processed_data <- read.csv("processed_data.csv")
+```
+
+```{r}
+# Remove clearly correlated variables to remove redundancy through feature selection
+processed_data <- processed_data %>% select(-Proportion_of_Fruits_CH, -Mature_CH_Fruits_Per_Day, -Mature_CL_Fruits_Per_Day, -Average_CH_Fruits_Per_Day, -Average_CL_Fruits_Per_Day, -Average_CH_Flowers_Per_Day, -Total_CH_Flower_Production, -Average_CL_Flowers_Per_Day, -Average_Seeds_Per_CH_Fruit, -Average_Seeds_Per_CL_Fruit, -Average_CH_Seed_Mass, -Average_CL_Seed_Mass)
+```
+
+```{r,fig.height=8,fig.width=10, warning=FALSE}
+# Check correlation between the variables
+# Create a correlation matrix from the dataframe
+cor_matrix <- cor(processed_data)
+
+# Melt the correlation matrix into a long format
+melted_matrix <- melt(cor_matrix)
+
+# Create the heatmap
+ggplot(melted_matrix, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() +
+  scale_fill_gradient2(low="blue", mid="white", high="red", midpoint=0) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),
+  axis.text.y = element_text(color = ifelse(melted_matrix$Var1 == "Ratio_of_CH_to_CL_Fruits", "red", "black"))) +
+  labs(title="Correlation Heatmap", x="", y="")
+```
+
+```{r}
+# Calculate the mean of the "Ratio_of_CH_to_CL_Fruits" column
+mean_ratio <- mean(processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Create a histogram and add the mean as a vertical line with its value
+ggplot(processed_data, aes(x = Ratio_of_CH_to_CL_Fruits)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 30, fill = "blue", color = "black", alpha = 0.5) +
+  geom_vline(aes(xintercept = mean_ratio), color = "red", linetype = "dashed", size = 1) +
+  annotate("text", x = mean_ratio, y = 0, label = paste("Mean =", round(mean_ratio, 2)), 
+           vjust = -1, color = "red", fontface = "bold") +
+  labs(x = "Ratio of CH to CL Fruits", y = "Density", title = "Histogram of Ratio of CH to CL Fruits with Mean")
+```
+
+```{r}
+# Perform PCA on the dataset
+pca <- prcomp(processed_data, center = TRUE, scale. = TRUE)
+
+# Extract principal components
+PC1 <- pca$x[,1]
+PC2 <- pca$x[,2]
+
+# Calculate the percentage of variance explained by each principal component
+pca_var <- (pca$sdev^2) / sum(pca$sdev^2)
+pca_var_percentage <- pca_var * 100
+
+# Create PCA plot with color based on "Ratio_of_CH_to_CL_Fruits"
+ggplot(processed_data, aes(x = PC1, y = PC2, color = Ratio_of_CH_to_CL_Fruits)) + 
+  geom_point() +
+  scale_color_gradient(low = "blue", high = "red") +
+  labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
+       y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
+       title = "PCA Plot")
+```
+```{r, warning=FALSE, message=FALSE}
+# Extract first 4 principal components
+PCs <- pca$x[, 1:4]
+
+# Calculate the percentage of variance explained by each principal component
+pca_var <- (pca$sdev^2) / sum(pca$sdev^2)
+pca_var_percentage <- pca_var * 100
+
+# Create a new data frame with the first 4 principal components and the Ratio_of_CH_to_CL_Fruits variable
+pca_data <- data.frame(PCs, Ratio_of_CH_to_CL_Fruits = processed_data$Ratio_of_CH_to_CL_Fruits)
+
+# Customize axis labels
+axis_labels <- paste0("PC", 1:4, " (", round(pca_var_percentage[1:4], 2), "%)")
+
+# Create a multifaceted PCA plot using ggpairs
+p <- ggpairs(
+  pca_data,
+  columns = 1:4,
+  mapping = aes(color = Ratio_of_CH_to_CL_Fruits),
+  upper = list(continuous = "points"),
+  lower = list(continuous = "points"),
+  diag = list(continuous = "barDiag"),
+  columnLabels = axis_labels,
+  title = "Pairwise Comparisons of First 4 Principal Components",
+  progress = FALSE
+)
+
+# Modify color gradient
+p <- p + scale_color_gradient(low = "blue", high = "red")
+
+# Print the plot
+print(p)
+```
+
+
+```{r}
+# Create a binary group column based on the condition (>1.95, <1.95)
+processed_data$Binary_Group <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > 1, ">1", "<1")
+
+# Create PCA plot with color based on binary groups
+ggplot(processed_data, aes(x = PC1, y = PC2, color = Binary_Group)) + 
+  geom_point() +
+  scale_color_manual(values = c("<1" = "blue", ">1" = "red"), name = "Binary Group") +
+  labs(x = paste0("PC1 (", round(pca_var_percentage[1], 2), "%)"), 
+       y = paste0("PC2 (", round(pca_var_percentage[2], 2), "%)"), 
+       title = "PCA Plot") 
+```
+```{r}
+# Create a new binary_response variable in the processed_data dataframe based on whether the Ratio_of_CH_to_CL_Fruits variable is greater than the mean value
+processed_data$binary_response <- ifelse(processed_data$Ratio_of_CH_to_CL_Fruits > 1, "CH", "CL")
+processed_data$binary_response <- as.factor(processed_data$binary_response)
+
+# Remove the Ratio_of_CH_to_CL_Fruits and Binary_Group variables from the processed_data dataframe
+processed_data <- processed_data %>% select(-Ratio_of_CH_to_CL_Fruits, -Binary_Group)
+
+# Split the processed_data dataframe into training and test sets using a 70/30 split ratio
+split <- sample.split(processed_data$binary_response, SplitRatio = 0.7)
+train <- processed_data[split,]
+test <- processed_data[!split,]
+
+# Train an SVM model on the training data using a linear kernel and cost parameter of 1
+svm_model <- svm(binary_response ~ ., data = train, kernel = "linear", type = "C-classification", cost = 1)
+
+# Make predictions on the test data using the trained SVM model
+svm_predictions <- predict(svm_model, newdata = test)
+```
+
+```{r}
+metrics(svm_predictions, test$binary_response)
+```
+
+```{r, fig.width = 10, fig.height = 8}
+# Build the decision tree model
+dt_model <- rpart(binary_response ~ ., data = processed_data, method = "class")
+
+# Plot the decision tree
+rpart.plot(dt_model, fallen.leaves = TRUE)
+```
+
+```{r}
+# Make predictions on the test set
+dt_predictions <- predict(dt_model, newdata = test, type = "class")
+
+metrics(dt_predictions, test$binary_response)
+```
+
+```{r}
+# Set up k-fold cross-validation
+k <- 5
+cv_folds <- createFolds(train$binary_response, k = k, list = TRUE, returnTrain = TRUE)
+
+# Create a train control object
+train_control <- trainControl(method = "cv", number = k, index = cv_folds, savePredictions = TRUE)
+
+# Train the random forest model with k-fold cross-validation
+rf_model_cv <- train(binary_response ~ ., data = train, method = "rf", trControl = train_control, tuneLength = 1)
+
+# Print the model and cross-validated performance metrics
+print(rf_model_cv)
+
+```
+
+
+```{r}
+# Make predictions on the test set
+rf_predictions <- predict(rf_model_cv, newdata = test)
+metrics(rf_predictions, test$binary_response)
+```
+
+```{r}
+plot_roc(rf_model_cv, test, test$binary_response)
+```
