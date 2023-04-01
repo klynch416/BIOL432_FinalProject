@@ -137,14 +137,14 @@ PDatCH <- data.frame(NMDS1 = NMDSCHdat$points[,1],
 
 PDatCH <- merge(PDatCH, factors, by = "Plot", all.x = T, all.y = F)
 
-ggplot(data = PDatCH) +
+CHM_Plot <- ggplot(data = PDatCH) +
   geom_point(aes(x = NMDS1, y = NMDS2, colour = interaction)) +
   scale_colour_discrete(name = "Interaction") +
   theme_classic()
 
 CH_Mating <- betadisper(nmdsCHdist, group = factors$interaction)
 permutest(CH_Mating)
-plot(CH_Mating, hull=FALSE, ellipse=TRUE) ##sd ellipse
+CHM_Plot <- plot(CH_Mating, hull=FALSE, ellipse=TRUE) ##sd ellipse
 
 ```
 
@@ -169,7 +169,7 @@ PDatCL <- data.frame(NMDS1 = NMDSCLdat$points[,1],
 
 PDatCL <- merge(PDatCL, factors, by = "Plot", all.x = T, all.y = F)
 
-ggplot(data = PDatCL) +
+CLM_Plot <- ggplot(data = PDatCL) +
   geom_point(aes(x = NMDS1, y = NMDS2, colour = interaction)) +
   scale_colour_discrete(name = "Interaction") +
   theme_classic()
@@ -179,6 +179,28 @@ permutest(CL_Mating)
 plot(CL_Mating, hull=FALSE, ellipse=TRUE)
 
 ```
+
+
+Saving figures
+Libraries
+```{r}
+
+library(ggpubr)
+
+```
+Logistic regressions
+```{r}
+
+```
+
+NMDS
+```{r}
+
+ggarrange(CLM_Plot, CHM_Plot, labels = "AUTO", nrow = 1, ncol = 2,
+          common.legend = TRUE)
+
+```
+
 
 
 
