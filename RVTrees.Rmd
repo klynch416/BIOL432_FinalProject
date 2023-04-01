@@ -90,6 +90,7 @@ test <- TDat[!split,]
 ```
 
 
+<<<<<<< HEAD
 Make the tree
 ```{r}
 # Build the decision tree model
