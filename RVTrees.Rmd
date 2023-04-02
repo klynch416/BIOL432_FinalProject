@@ -66,7 +66,7 @@ summary(Dat3$Average_CL_Seed_Mass)
 
 Make Average CL seed mass into a binary response variable (mean and above = Success, below = Dead)
 ```{r}
-Dat3$Binary_Avg_Seed_Mass <- ifelse(Dat3$Average_CL_Seed_Mass > mean(Dat3$Average_CL_Seed_Mass), "Success", "Dead")
+Dat3$Binary_Avg_Seed_Mass <- ifelse(Dat3$Average_CL_Seed_Mass > mean(Dat3$Average_CL_Seed_Mass), "High success", "Low success")
 Dat3$Binary_Avg_Seed_Mass <- as.factor(Dat3$Binary_Avg_Seed_Mass)
 ```
 
