@@ -46,7 +46,7 @@ hist(Dat$Average_CL_Seed_Mass)
 Remove CH column:
 ```{r}
 Dat2 <- Dat %>%
-  select(-c(Plot_Number, Average_CH_Seed_Mass))
+  select(-c(Plot_Number, Average_CH_Seed_Mass, Date_of_First_CH_Flower))
 ```
 
 Checking summary stats for the average CH seed mass:
@@ -64,9 +64,10 @@ Summary to see new mean of CL seed mass (after NAs removed)
 summary(Dat3$Average_CL_Seed_Mass)
 ```
 
-Make Average CL seed mass into a binary response variable (mean and above = 1, below = 0)
+Make Average CL seed mass into a binary response variable (mean and above = Success, below = Dead)
 ```{r}
-Dat3$Binary_Avg_Seed_Mass <- ifelse(Dat3$Average_CL_Seed_Mass > mean(Dat3$Average_CL_Seed_Mass), 1, 0)
+Dat3$Binary_Avg_Seed_Mass <- ifelse(Dat3$Average_CL_Seed_Mass > mean(Dat3$Average_CL_Seed_Mass), "Success", "Dead")
+Dat3$Binary_Avg_Seed_Mass <- as.factor(Dat3$Binary_Avg_Seed_Mass)
 ```
 
 Remove Average CL Seed Mass Column
@@ -81,10 +82,25 @@ TDat <- TreeDat %>%
          Pollination = as.factor(Pollination))
 ```
 
-Make the tree:
 ```{r}
-SeedMassTree <- tree(Binary_Avg_Seed_Mass ~ ., data = TDat, method = "class")
+# Split the processed_data dataframe into training and test sets using a 70/30 split ratio
+split <- sample.split(TDat$Binary_Avg_Seed_Mass, SplitRatio = 0.7)
+train <- TDat[split,]
+test <- TDat[!split,]
+```
 
-plot(SeedMassTree) # hmmmmmm
-text(SeedMassTree, cex = 0.7, adj = 0)
+
+<<<<<<< HEAD
+Make the tree
+```{r}
+# Build the decision tree model
+SeedMassTree <- rpart(Binary_Avg_Seed_Mass ~ ., data = train, method = "class")
+# Plot the decision tree
+rpart.plot(SeedMassTree, fallen.leaves = TRUE)
+```
+
+```{r}
+seed_mass_predictions <- predict(SeedMassTree, newdata = test, type = "class")
+
+
 ```
