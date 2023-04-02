@@ -183,9 +183,10 @@ library(ggpubr)
 Logistic regressions
 ```{r}
 
-ggarrange(CHP, CLP, CHR, CLR, CHT, CLT,
+LR_Plot <- ggarrange(CHP, CLP, CHR, CLR, CHT, CLT,
           nrow = 3, ncol = 2)
 
+ggsave("LRPlot.png", plot = LR_Plot, path = "C:/Users/Kerri/OneDrive - Queen's University/5th year/Winter/BIOL432/BIOL432_FinalProject", width = 6, height = 8)
 
 ```
 
